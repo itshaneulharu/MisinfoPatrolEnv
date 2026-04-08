@@ -1,0 +1,159 @@
+name: MisinfoPatrolEnv
+version: "1.0.0"
+description: >
+  A real-world OpenEnv where an AI agent acts as a social-media fact-checker.
+  Given a viral post, the agent must extract embedded factual claims, assign
+  per-claim verdicts (true/false/misleading/unverifiable), and label the post
+  overall. Reward is a weighted composite of claim extraction quality, verdict
+  accuracy, and correct overall classification.
+
+domain: content_moderation
+tags:
+  - misinformation
+  - fact-checking
+  - nlp
+  - social-media
+  - content-moderation
+  - openenv
+
+author: Jeysuriya R, Karunya Vazhvarasu, Kaviyadharshini
+license: MIT
+
+# ─── Observation Space ────────────────────────────────────────────────────────
+observation_space:
+  type: object
+  required:
+    - post_id
+    - post_text
+    - task_id
+    - task_difficulty
+    - instructions
+    - step_count
+    - max_steps
+  properties:
+    post_id:
+      type: string
+      description: Unique identifier for the viral social-media post
+    post_text:
+      type: string
+      description: Full text of the post to fact-check
+    task_id:
+      type: string
+      description: Active task identifier
+    task_difficulty:
+      type: string
+      enum: [easy, medium, hard]
+    instructions:
+      type: string
+      description: Natural-language instructions for the agent
+    step_count:
+      type: integer
+      minimum: 0
+    max_steps:
+      type: integer
+      minimum: 1
+
+# ─── Action Space ─────────────────────────────────────────────────────────────
+action_space:
+  type: object
+  required:
+    - claims
+    - verdicts
+    - overall_label
+    - reasoning
+  properties:
+    claims:
+      type: array
+      items:
+        type: string
+      description: Factual claims extracted from the post
+    verdicts:
+      type: array
+      items:
+        type: string
+        enum: [true, false, misleading, unverifiable]
+      description: Verdict for each claim (same order as claims)
+    overall_label:
+      type: string
+      enum: [credible, misinformation, misleading, unverifiable]
+      description: Overall credibility label for the post
+    reasoning:
+      type: string
+      description: Brief fact-checking rationale (2–4 sentences)
+
+# ─── Reward ───────────────────────────────────────────────────────────────────
+reward:
+  range: [0.0, 1.0]
+  type: continuous
+  signal: dense  # partial credit provided at every step
+  components:
+    claim_extraction:
+      weight: 0.30
+      description: How completely the agent identified key claims (keyword overlap)
+    verdict_accuracy:
+      weight: 0.40
+      description: Correctness of per-claim verdicts; partial credit for misleading↔false
+    overall_label:
+      weight: 0.30
+      description: Exact match on post label; 0.5 credit for misleading↔misinformation swap
+  penalties:
+    empty_claims: -0.10
+    missing_reasoning: -0.05
+
+# ─── Tasks ────────────────────────────────────────────────────────────────────
+tasks:
+  - id: easy_brain_myth
+    difficulty: easy
+    description: >
+      A single classic myth ("10% of the brain") wrapped in sensationalist
+      anti-establishment language. Agent must identify the myth, debunk it,
+      and flag the censorship framing.
+
+  - id: medium_mixed_facts
+    difficulty: medium
+    description: >
+      A "fun facts" post mixing one true claim with three false ones
+      (space visibility of Great Wall, lightning strikes, largest desert).
+      Agent must sift true from false without being misled by the friendly tone.
+
+  - id: hard_misleading_vaers
+    difficulty: hard
+    description: >
+      A post exploiting real VAERS statistics in a misleading framing to suggest
+      mass vaccine harm. Technically-true numbers, false causal conclusions.
+      Requires distinguishing "report count" from "confirmed harm" and contextualising
+      accelerated regulatory timelines.
+
+# ─── Episode Configuration ────────────────────────────────────────────────────
+episode:
+  max_steps: 3
+  early_termination_threshold: 0.90  # episode ends if reward ≥ 0.90
+
+# ─── Endpoints ────────────────────────────────────────────────────────────────
+endpoints:
+  reset:
+    method: POST
+    path: /reset
+    query_params:
+      task_id:
+        type: string
+        required: false
+  step:
+    method: POST
+    path: /step/{session_id}
+  state:
+    method: GET
+    path: /state/{session_id}
+  tasks:
+    method: GET
+    path: /tasks
+  health:
+    method: GET
+    path: /health
+
+# ─── Infrastructure ───────────────────────────────────────────────────────────
+deployment:
+  platform: huggingface_spaces
+  space_type: docker
+  port: 7860
+  dockerfile: Dockerfile
