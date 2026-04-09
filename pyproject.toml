@@ -24,12 +24,16 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
 ]
 dependencies = [
+    "openenv-core>=0.2.0",
     "gradio>=3.0",
     "torch>=2.0",
     "transformers>=4.30",
     "numpy>=1.21",
     "pandas>=1.3",
 ]
+
+[project.scripts]
+server = "server.app:main"
 
 [project.optional-dependencies]
 dev = [
@@ -45,7 +49,7 @@ Documentation = "https://huggingface.co/spaces/ItsHaneulHaru/MisinfoPatrolEnv"
 Repository = "https://huggingface.co/spaces/ItsHaneulHaru/MisinfoPatrolEnv"
 
 [tool.setuptools]
-packages = ["misinfo_patrol"]
+packages = ["server"]
 
 [tool.black]
 line-length = 88
